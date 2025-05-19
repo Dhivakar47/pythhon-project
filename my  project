@@ -1,0 +1,135 @@
+import sqlite3
+from tkinter import *
+from tkinter import ttk, messagebox
+
+# ---------- Database Setup ----------
+conn = sqlite3.connect('advanced_tasks.db')
+cursor = conn.cursor()
+
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        category TEXT,
+        due_date TEXT,
+        priority TEXT
+    )
+''')
+conn.commit()
+
+# ---------- App Functions ----------
+def add_task():
+    title = title_entry.get().strip()
+    category = category_var.get()
+    due_date = due_date_entry.get()
+    priority = priority_var.get()
+
+    if not title:
+        messagebox.showwarning("Input Error", "Task title is required.")
+        return
+
+    cursor.execute("INSERT INTO tasks (title, category, due_date, priority) VALUES (?, ?, ?, ?)",
+                   (title, category, due_date, priority))
+    conn.commit()
+    clear_inputs()
+    load_tasks()
+
+def clear_inputs():
+    title_entry.delete(0, END)
+    category_var.set("General")
+    due_date_entry.delete(0, END)
+    priority_var.set("Medium")
+
+def delete_selected():
+    selected = tree.focus()
+    if selected:
+        task_id = tree.item(selected)['values'][0]
+        cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        conn.commit()
+        load_tasks()
+    else:
+        messagebox.showwarning("Delete Task", "Please select a task to delete.")
+
+def load_tasks():
+    for i in tree.get_children():
+        tree.delete(i)
+
+    cursor.execute("SELECT * FROM tasks ORDER BY due_date")
+    for row in cursor.fetchall():
+        tree.insert('', END, values=row)
+
+def close_app():
+    conn.close()
+    root.destroy()
+
+# ---------- UI Setup ----------
+root = Tk()
+root.title("📝 Classic To-Do List")
+root.geometry("800x500")
+root.configure(bg="#fef6e4")  # Classic cream
+root.resizable(False, False)
+
+# Fonts
+FONT_TITLE = ("Times New Roman", 18, "bold")
+FONT_LABEL = ("Times New Roman", 12)
+FONT_ENTRY = ("Times New Roman", 12)
+FONT_BTN = ("Times New Roman", 12, "bold")
+
+# Input frame
+input_frame = Frame(root, bg="#fef6e4")
+input_frame.pack(pady=10, padx=10, fill=X)
+
+Label(input_frame, text="Task:", bg="#fef6e4", font=FONT_LABEL).grid(row=0, column=0, padx=5)
+title_entry = Entry(input_frame, width=30, font=FONT_ENTRY)
+title_entry.grid(row=0, column=1, padx=5)
+
+Label(input_frame, text="Category:", bg="#fef6e4", font=FONT_LABEL).grid(row=0, column=2, padx=5)
+category_var = StringVar(value="General")
+category_menu = ttk.Combobox(input_frame, textvariable=category_var, values=["Work", "Personal", "General"], width=15, font=FONT_ENTRY)
+category_menu.grid(row=0, column=3, padx=5)
+
+Label(input_frame, text="Due Date (YYYY-MM-DD):", bg="#fef6e4", font=FONT_LABEL).grid(row=1, column=0, padx=5)
+due_date_entry = Entry(input_frame, width=30, font=FONT_ENTRY)
+due_date_entry.grid(row=1, column=1, padx=5)
+
+Label(input_frame, text="Priority:", bg="#fef6e4", font=FONT_LABEL).grid(row=1, column=2, padx=5)
+priority_var = StringVar(value="Medium")
+priority_menu = ttk.Combobox(input_frame, textvariable=priority_var, values=["High", "Medium", "Low"], width=15, font=FONT_ENTRY)
+priority_menu.grid(row=1, column=3, padx=5)
+
+# Buttons
+button_frame = Frame(root, bg="#fef6e4")
+button_frame.pack(pady=5)
+
+add_btn = Button(button_frame, text="Add Task", bg="#4a7ebB", fg="white", font=FONT_BTN, command=add_task)
+add_btn.pack(side=LEFT, padx=10)
+
+del_btn = Button(button_frame, text="Delete Selected", bg="#b85c38", fg="white", font=FONT_BTN, command=delete_selected)
+del_btn.pack(side=LEFT, padx=10)
+
+exit_btn = Button(button_frame, text="Exit", bg="#61677A", fg="white", font=FONT_BTN, command=close_app)
+exit_btn.pack(side=LEFT, padx=10)
+
+# Task list (Treeview)
+tree_frame = Frame(root)
+tree_frame.pack(pady=10, padx=10, fill=BOTH, expand=True)
+
+cols = ("ID", "Title", "Category", "Due Date", "Priority")
+tree = ttk.Treeview(tree_frame, columns=cols, show="headings", height=15)
+style = ttk.Style()
+style.configure("Treeview.Heading", font=("Times New Roman", 12, "bold"))
+style.configure("Treeview", font=("Times New Roman", 11), rowheight=25)
+
+for col in cols:
+    tree.heading(col, text=col)
+    tree.column(col, anchor=CENTER)
+
+tree.pack(side=LEFT, fill=BOTH, expand=True)
+
+scrollbar = Scrollbar(tree_frame, orient=VERTICAL, command=tree.yview)
+tree.configure(yscroll=scrollbar.set)
+scrollbar.pack(side=RIGHT, fill=Y)
+
+# Load existing tasks
+load_tasks()
+root.mainloop()
